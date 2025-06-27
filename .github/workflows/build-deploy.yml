@@ -1,0 +1,24 @@
+name: Build and push dlcs-varnish docker image
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "*"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-push-manifest-colmun-updater:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/docker-build-and-push
+        name: build and push
+        with:
+          image-name: "manifest-column-updater"
+          dockerfile: "Dockerfile"
+          context: "../src"
+          github-token: ${{ secrets.GITHUB_TOKEN }}

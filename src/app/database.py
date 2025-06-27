@@ -14,6 +14,10 @@ def connect_to_postgres(connection_info, connection_timeout: str):
 
 
 def get_connection_config(connection_string: str):
+    if connection_string is None:
+        logger.error("connection string is empty. Exiting")
+        exit()
+
     result = urlparse(connection_string)
     username = result.username
     password = result.password

@@ -1,9 +1,14 @@
 FROM python:3.13-slim-bookworm
 
 COPY requirements.txt /opt/app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt --target /opt/app/
+
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc
+
+RUN  pip install --no-cache-dir -r /opt/app/requirements.txt
 
 COPY *.py /opt/app
-COPY app/*.py /opt/app/app
+COPY app/ /opt/app/app
 
-ENTRYPOINT ["python3"]
+ENTRYPOINT ["python", "/opt/app/manifest-column-updater.py"]

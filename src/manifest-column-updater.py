@@ -1,15 +1,13 @@
-import base64
-
 from logzero import logger
 from app.settings import (CONNECTION_TIMEOUT, DRY_RUN, PRESENTATION_CONNECTION_STRING, PROTAGONIST_BASE_URL,
-                          ASSET_SPLIT_SIZE, DLCS_API_AUTH, EXIT_ON_ERROR)
+                          ASSET_SPLIT_SIZE, DLCS_API_AUTH, EXIT_ON_ERROR, HIGH_WATER_MARK)
 from app.database import connect_to_postgres, get_connection_config
 
 import os
 import collections
 import requests
 import urllib.parse
-import sys
+import time
 
 
 def update_manifest_column():
@@ -23,12 +21,11 @@ def update_manifest_column():
 def __get_assets_to_update(conn) -> collections.defaultdict[str, list]:
     cur = conn.cursor()
 
-    # todo: high water mark
-
     cur.execute(f"""
                 SELECT asset_id,manifest_id 
                 FROM canvas_paintings 
                 WHERE asset_id IS NOT NULL
+                AND modified > '{HIGH_WATER_MARK}'
                 ORDER BY modified;
             """)
 
@@ -52,7 +49,10 @@ def generate_split_asset_string(split_assets):
 def __update_protagonist(manifests: collections.defaultdict[str, list]):
     logger.info(f"updating {len(manifests)} manifests with a manifest in protagonist")
 
-    for manifest in manifests:
+    if DRY_RUN:
+        logger.info("running in dry run mode, manifests will not actually be updated")
+
+    for iteration, manifest in enumerate(manifests):
         values = manifests[manifest]
         for i in range(0, len(values), ASSET_SPLIT_SIZE):
             split_assets = values[i: i + ASSET_SPLIT_SIZE]
@@ -66,7 +66,9 @@ def __update_protagonist(manifests: collections.defaultdict[str, list]):
                 asset_id = {'id': split_asset}
                 asset_ids.append(asset_id)
 
-            # todo pause 300ms on every 10th manifest
+            # pause 300ms on every 10th manifest to allow API to catch up
+            if iteration % 10 == 0 and iteration != 0:
+                time.sleep(0.3)
 
             member_data = {
                 'member': asset_ids,
@@ -75,18 +77,19 @@ def __update_protagonist(manifests: collections.defaultdict[str, list]):
                 'operation': 'add'
             }
 
+            logger.debug(f"updating manifest {manifest} with assets {split_assets}")
+
             if not DRY_RUN:
                 response = requests.patch(protagonist_url,
-                                  json=member_data,
-                                  headers={
-                    "Authorization": f"Basic {DLCS_API_AUTH}"})
+                                          json=member_data,
+                                          headers={
+                                              "Authorization": f"Basic {DLCS_API_AUTH}"})
 
                 if not response.ok:
                     logger.error(f"response does not indicate success for manifest {manifest} - {response.text}")
                     if EXIT_ON_ERROR:
-                        sys.exit()
-
-        # todo: add some extra logging at the end
+                        exit()
+    logger.info(f"updated {len(manifests)} manifests")
 
 
 def __build_url(base_url, path):
