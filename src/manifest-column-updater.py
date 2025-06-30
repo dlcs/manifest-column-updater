@@ -77,7 +77,8 @@ def _update_protagonist(manifests: collections.defaultdict[str, (list, str)]):
                 asset_id = {'id': split_asset}
                 asset_ids.append(asset_id)
 
-            # pause 300ms on every 10th manifest to allow API to catch up            if iteration % 10 == 0 and iteration != 0:
+            # pause 300ms on every 10th manifest to allow API to catch up
+            if iteration % 10 == 0 and iteration != 0:
                 time.sleep(0.3)
 
             member_data = {
