@@ -1,4 +1,4 @@
-name: Build and push dlcs-varnish docker image
+name: Build and push manifest-column-updater docker image
 
 on:
   push:
@@ -14,7 +14,7 @@ jobs:
   build-push-manifest-colmun-updater:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/docker-build-and-push
         name: build and push
         with:
