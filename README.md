@@ -46,3 +46,11 @@ python -m .\manifest-column-updater.py
 | PROTAGONIST_BASE_URL           | The base URL for the protagonist API                                                                       | string   |
 | DLCS_API_AUTH                  | base64 encoded credentials for talking to the protagonist API. NOTE: these should be admin                 | string   |
 | EXIT_ON_ERROR                  | If an error is detected when talking to protagonist, the application will exit when true                   | boolean  |
+
+## Freezing dependencies
+
+if using powershell, the dependencies can be frozen using the following command:
+
+```powershell
+pip freeze -l | Out-File requirements.txt -Encoding UTF8
+```
