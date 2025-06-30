@@ -1,3 +1,4 @@
+from charset_normalizer import assets
 from logzero import logger
 from app.settings import (CONNECTION_TIMEOUT, DRY_RUN, PRESENTATION_CONNECTION_STRING, PROTAGONIST_BASE_URL,
                           ASSET_SPLIT_SIZE, DLCS_API_AUTH, EXIT_ON_ERROR, HIGH_WATER_MARK)
@@ -15,14 +16,14 @@ def update_manifest_column():
 
     pres_conn = connect_to_postgres(connection_info=presentation_connection_info, connection_timeout=CONNECTION_TIMEOUT)
 
-    __run_sql(pres_conn)
+    _run_sql(pres_conn)
 
 
-def __get_assets_to_update(conn) -> collections.defaultdict[str, list]:
+def _get_assets_to_update(conn) -> collections.defaultdict[str, (list, str)]:
     cur = conn.cursor()
 
     cur.execute(f"""
-                SELECT asset_id,manifest_id 
+                SELECT asset_id,manifest_id,modified
                 FROM canvas_paintings 
                 WHERE asset_id IS NOT NULL
                 AND modified > '{HIGH_WATER_MARK}'
@@ -30,10 +31,17 @@ def __get_assets_to_update(conn) -> collections.defaultdict[str, list]:
             """)
 
     assets = cur.fetchall()
-    manifest_dictionary = collections.defaultdict(list)
+    # creates a defaultdict[str, (list, str)] - key = manifest_id, value = ([asset_id], modified)
+    # defaultdict requires something "callable", which a tuple isn't, so calling through a lambda allows this to happen
+    manifest_dictionary = collections.defaultdict(lambda: ([], ''))
 
     for asset in assets:
-        manifest_dictionary[asset[1]].append(asset[0])
+        if asset[1] in manifest_dictionary:
+            value = manifest_dictionary[asset[1]]
+            value[0].append(asset[0])
+            manifest_dictionary[asset[1]] = value
+        else:
+            manifest_dictionary[asset[1]] = ([asset[0]], asset[2])
 
     return manifest_dictionary
 
@@ -46,20 +54,23 @@ def generate_split_asset_string(split_assets):
     return asset_string[:-1 - len(os.linesep)]
 
 
-def __update_protagonist(manifests: collections.defaultdict[str, list]):
-    logger.info(f"updating {len(manifests)} manifests with a manifest in protagonist")
+def _update_protagonist(manifests: collections.defaultdict[str, (list, str)]):
+    logger.info(f"updating {len(manifests)} manifests from presentation in protagonist")
 
     if DRY_RUN:
         logger.info("running in dry run mode, manifests will not actually be updated")
 
     for iteration, manifest in enumerate(manifests):
-        values = manifests[manifest]
-        for i in range(0, len(values), ASSET_SPLIT_SIZE):
-            split_assets = values[i: i + ASSET_SPLIT_SIZE]
+        assets_and_modified_date = manifests[manifest]
+        just_assets = assets_and_modified_date[0]
+        for i in range(0, len(just_assets), ASSET_SPLIT_SIZE):
+            # get assets between i and i + ASSET_SPLIT_SIZE
+            split_assets = just_assets[i: i + ASSET_SPLIT_SIZE]
 
+            # grabs the customer id from the first asset
             customer_id = split_assets[0].split('/')[0]
 
-            protagonist_url = __build_url(PROTAGONIST_BASE_URL, f'/customers/{customer_id}/allImages')
+            protagonist_url = _build_url(PROTAGONIST_BASE_URL, f'/customers/{customer_id}/allImages')
 
             asset_ids = []
             for split_asset in split_assets:
@@ -77,7 +88,7 @@ def __update_protagonist(manifests: collections.defaultdict[str, list]):
                 'operation': 'add'
             }
 
-            logger.debug(f"updating manifest {manifest} with assets {split_assets}")
+            logger.debug(f"updating manifest {manifest} with assets {split_assets} with a modified date of {assets_and_modified_date[1]}")
 
             if not DRY_RUN:
                 response = requests.patch(protagonist_url,
@@ -86,22 +97,22 @@ def __update_protagonist(manifests: collections.defaultdict[str, list]):
                                               "Authorization": f"Basic {DLCS_API_AUTH}"})
 
                 if not response.ok:
-                    logger.error(f"response does not indicate success for manifest {manifest} - {response.text}")
+                    logger.error(f"response does not indicate success for manifest {manifest} - {response.text}, with a modified date {assets_and_modified_date[1]}")
                     if EXIT_ON_ERROR:
                         exit()
     logger.info(f"updated {len(manifests)} manifests")
 
 
-def __build_url(base_url, path):
+def _build_url(base_url, path):
     url_parts = list(urllib.parse.urlparse(base_url))
     url_parts[2] = path
     return urllib.parse.urlunparse(url_parts)
 
 
-def __run_sql(pres_conn):
-    manifests = __get_assets_to_update(pres_conn)
+def _run_sql(pres_conn):
+    manifests = _get_assets_to_update(pres_conn)
 
-    __update_protagonist(manifests)
+    _update_protagonist(manifests)
 
 
 if __name__ == '__main__':
