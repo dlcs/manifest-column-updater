@@ -20,5 +20,5 @@ jobs:
         with:
           image-name: "manifest-column-updater"
           dockerfile: "Dockerfile"
-          context: "../src"
+          context: "src"
           github-token: ${{ secrets.GITHUB_TOKEN }}
