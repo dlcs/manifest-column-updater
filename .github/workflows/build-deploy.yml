@@ -19,6 +19,6 @@ jobs:
         name: build and push
         with:
           image-name: "manifest-column-updater"
-          dockerfile: "Dockerfile"
-          context: "src"
+          dockerfile: "src/Dockerfile"
+          context: "./src"
           github-token: ${{ secrets.GITHUB_TOKEN }}
