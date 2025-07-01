@@ -1,4 +1,3 @@
-from charset_normalizer import assets
 from logzero import logger
 from app.settings import (CONNECTION_TIMEOUT, DRY_RUN, PRESENTATION_CONNECTION_STRING, PROTAGONIST_BASE_URL,
                           ASSET_SPLIT_SIZE, DLCS_API_AUTH, EXIT_ON_ERROR, HIGH_WATER_MARK)
