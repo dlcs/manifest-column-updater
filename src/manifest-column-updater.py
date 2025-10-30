@@ -10,6 +10,24 @@ import urllib.parse
 import time
 
 
+def GetCustomers(conn):
+    cur = conn.cursor()
+
+    cur.execute(f"""
+                    SELECT DISTINCT customer_id
+                    FROM canvas_paintings;
+                """)
+
+    customers = cur.fetchall()
+    customer_list = []
+
+    for customer in customers:
+        customer_list.append(customer[0])
+    logger.info(f"found the following customers to update: {customer_list}")
+
+    return customer_list
+
+
 def update_manifest_column():
     presentation_connection_info = get_connection_config(connection_string=PRESENTATION_CONNECTION_STRING)
 
@@ -18,7 +36,7 @@ def update_manifest_column():
     _run_sql(pres_conn)
 
 
-def _get_assets_to_update(conn) -> collections.defaultdict[str, (list, str)]:
+def _get_assets_to_update(conn, customer: int) -> collections.defaultdict[str, (list, str)]:
     cur = conn.cursor()
 
     cur.execute(f"""
@@ -26,6 +44,7 @@ def _get_assets_to_update(conn) -> collections.defaultdict[str, (list, str)]:
                 FROM canvas_paintings 
                 WHERE asset_id IS NOT NULL
                 AND modified > '{HIGH_WATER_MARK}'
+                AND customer_id = {customer}
                 ORDER BY modified;
             """)
 
@@ -109,9 +128,13 @@ def _build_url(base_url, path):
 
 
 def _run_sql(pres_conn):
-    manifests = _get_assets_to_update(pres_conn)
 
-    _update_protagonist(manifests)
+    customers = GetCustomers(pres_conn)
+
+    for customer in customers:
+        manifests = _get_assets_to_update(pres_conn, customer)
+
+        _update_protagonist(manifests)
 
 
 if __name__ == '__main__':
