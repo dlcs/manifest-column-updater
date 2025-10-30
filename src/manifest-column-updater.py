@@ -14,8 +14,7 @@ def GetCustomers(conn):
     cur = conn.cursor()
 
     cur.execute(f"""
-                    SELECT DISTINCT ON (customer_id)
-                        customer_id
+                    SELECT DISTINCT customer_id
                     FROM canvas_paintings;
                 """)
 
